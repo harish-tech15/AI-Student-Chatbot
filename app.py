@@ -1,114 +1,287 @@
-import streamlit as st
-import numpy as np
-import pickle
+```python
+import os
 import json
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+import pickle
+
+import numpy as np
+import streamlit as st
+import keras
 
 
-# -----------------------------
-# Page Configuration
-# -----------------------------
+# --------------------------------------------------
+# PAGE CONFIG
+# --------------------------------------------------
+
 st.set_page_config(
-    page_title="AI Student Tutor",
-    page_icon="🎓",
+    page_title="AI Student Chatbot",
+    page_icon="🤖",
     layout="centered"
 )
 
 
-# -----------------------------
-# Load Model and Files
-# -----------------------------
+# --------------------------------------------------
+# PATHS
+# --------------------------------------------------
+
+MODEL_PATH = "model/chatbot_model.keras"
+TOKENIZER_PATH = "model/tokenizer.pkl"
+LABEL_ENCODER_PATH = "model/label_encoder.pkl"
+INTENTS_PATH = "data/intents.json"
+
+
+# --------------------------------------------------
+# LOAD CHATBOT
+# --------------------------------------------------
+
 @st.cache_resource
 def load_chatbot():
 
-    model = load_model("model/chatbot_model.keras")
+    # Check model
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(
+            f"Model file not found: {MODEL_PATH}"
+        )
 
-    with open("model/tokenizer.pkl", "rb") as file:
+    # Check tokenizer
+    if not os.path.exists(TOKENIZER_PATH):
+        raise FileNotFoundError(
+            f"Tokenizer file not found: {TOKENIZER_PATH}"
+        )
+
+    # Check label encoder
+    if not os.path.exists(LABEL_ENCODER_PATH):
+        raise FileNotFoundError(
+            f"Label encoder file not found: {LABEL_ENCODER_PATH}"
+        )
+
+    # Check intents
+    if not os.path.exists(INTENTS_PATH):
+        raise FileNotFoundError(
+            f"Intents file not found: {INTENTS_PATH}"
+        )
+
+    # ----------------------------------------------
+    # Load Keras model
+    # ----------------------------------------------
+
+    model = keras.saving.load_model(
+        MODEL_PATH,
+        compile=False
+    )
+
+    # ----------------------------------------------
+    # Load tokenizer
+    # ----------------------------------------------
+
+    with open(TOKENIZER_PATH, "rb") as file:
         tokenizer = pickle.load(file)
 
-    with open("model/label_encoder.pkl", "rb") as file:
+    # ----------------------------------------------
+    # Load label encoder
+    # ----------------------------------------------
+
+    with open(LABEL_ENCODER_PATH, "rb") as file:
         label_encoder = pickle.load(file)
 
-    with open("data/intents.json", "r", encoding="utf-8") as file:
+    # ----------------------------------------------
+    # Load intents
+    # ----------------------------------------------
+
+    with open(INTENTS_PATH, "r", encoding="utf-8") as file:
         intents = json.load(file)
 
     return model, tokenizer, label_encoder, intents
 
 
-model, tokenizer, label_encoder, intents = load_chatbot()
+# --------------------------------------------------
+# LOAD MODEL SAFELY
+# --------------------------------------------------
+
+try:
+
+    model, tokenizer, label_encoder, intents = load_chatbot()
+
+except Exception as e:
+
+    st.error("❌ Chatbot model could not be loaded.")
+
+    st.code(str(e))
+
+    st.info(
+        "Please check the model, tokenizer, label encoder, "
+        "intents.json and requirements.txt files."
+    )
+
+    st.stop()
 
 
-# -----------------------------
-# Find Response
-# -----------------------------
-def get_response(user_input):
+# --------------------------------------------------
+# FIND INTENT RESPONSE
+# --------------------------------------------------
 
-    sequence = tokenizer.texts_to_sequences([user_input])
-    padded = pad_sequences(sequence, maxlen=20, padding="post")
+def get_response(intent_name):
 
-    prediction = model.predict(padded, verbose=0)
+    """
+    Find the response corresponding to the predicted intent.
+    """
 
-    confidence = float(np.max(prediction))
-    predicted_index = int(np.argmax(prediction))
+    # Case 1: intents.json is a dictionary
+    if isinstance(intents, dict):
 
-    predicted_tag = label_encoder.inverse_transform(
-        [predicted_index]
-    )[0]
+        # Standard format:
+        # {
+        #   "intents": [
+        #       {
+        #           "tag": "...",
+        #           "patterns": [],
+        #           "responses": []
+        #       }
+        #   ]
+        # }
 
-    # Confidence check
-    if confidence < 0.50:
-        return (
-            "I'm not fully sure about that question. "
-            "Please ask me about Python, SQL, Machine Learning, "
-            "Deep Learning, Data Science, CNN, or LSTM."
-        )
+        intent_list = intents.get("intents", [])
 
-    # Find matching intent
-    for intent in intents["intents"]:
+        for intent in intent_list:
 
-        if intent["tag"] == predicted_tag:
+            if intent.get("tag") == intent_name:
 
-            responses = intent["responses"]
+                responses = intent.get("responses", [])
 
-            # Simple deterministic response
-            return responses[0]
+                if responses:
+                    return responses[0]
 
-    return "Sorry, I couldn't understand your question."
+    return "Sorry, I don't have an answer for that question yet."
 
 
-# -----------------------------
-# UI
-# -----------------------------
-st.title("🎓 AI Student Tutor")
+# --------------------------------------------------
+# PREDICT INTENT
+# --------------------------------------------------
+
+def predict_intent(user_text):
+
+    """
+    Convert user text into a sequence and predict intent.
+    """
+
+    # Convert text to sequence
+    sequence = tokenizer.texts_to_sequences([user_text])
+
+    # Convert to numpy array
+    sequence = np.array(sequence)
+
+    # Model prediction
+    prediction = model.predict(
+        sequence,
+        verbose=0
+    )
+
+    # Get highest probability
+    predicted_index = int(np.argmax(prediction[0]))
+
+    confidence = float(
+        np.max(prediction[0])
+    )
+
+    # Convert index to intent name
+    try:
+
+        intent_name = label_encoder.inverse_transform(
+            [predicted_index]
+        )[0]
+
+    except Exception:
+
+        intent_name = str(predicted_index)
+
+    return intent_name, confidence
+
+
+# --------------------------------------------------
+# HEADER
+# --------------------------------------------------
+
+st.title("🤖 AI Student Chatbot")
+
 st.write(
-    "Ask questions about Python, SQL, Data Science, "
-    "Machine Learning and Deep Learning."
+    "Ask questions about Machine Learning, "
+    "Deep Learning, Python, AI and Data Science."
 )
 
+st.divider()
 
-# -----------------------------
-# Chat History
-# -----------------------------
+
+# --------------------------------------------------
+# SIDEBAR
+# --------------------------------------------------
+
+with st.sidebar:
+
+    st.header("📚 Student Assistant")
+
+    st.write(
+        "This chatbot uses a trained Deep Learning "
+        "model to identify the user's intent."
+    )
+
+    st.divider()
+
+    st.subheader("Example Questions")
+
+    st.write("• What is Machine Learning?")
+
+    st.write("• What is Deep Learning?")
+
+    st.write("• What is Python?")
+
+    st.write("• What is Artificial Intelligence?")
+
+    st.write("• What is Data Science?")
+
+    st.divider()
+
+    st.caption(
+        "AI Student Chatbot"
+    )
+
+
+# --------------------------------------------------
+# CHAT HISTORY
+# --------------------------------------------------
+
 if "messages" not in st.session_state:
+
     st.session_state.messages = []
 
+
+# Display previous messages
 
 for message in st.session_state.messages:
 
     with st.chat_message(message["role"]):
+
         st.write(message["content"])
 
 
-# -----------------------------
-# Chat Input
-# -----------------------------
-user_input = st.chat_input("Ask your question...")
+# --------------------------------------------------
+# USER INPUT
+# --------------------------------------------------
 
+user_input = st.chat_input(
+    "Ask your question..."
+)
+
+
+# --------------------------------------------------
+# CHATBOT RESPONSE
+# --------------------------------------------------
 
 if user_input:
 
-    # User message
+    # Display user message
+    with st.chat_message("user"):
+
+        st.write(user_input)
+
     st.session_state.messages.append(
         {
             "role": "user",
@@ -116,11 +289,38 @@ if user_input:
         }
     )
 
-    with st.chat_message("user"):
-        st.write(user_input)
+    # Predict
+    try:
 
-    # Bot response
-    response = get_response(user_input)
+        intent_name, confidence = predict_intent(
+            user_input
+        )
+
+        response = get_response(
+            intent_name
+        )
+
+        # Confidence threshold
+        if confidence < 0.35:
+
+            response = (
+                "I'm not fully sure about that question. "
+                "Please try asking it in a different way."
+            )
+
+    except Exception as e:
+
+        response = (
+            "Sorry, something went wrong while "
+            "processing your question."
+        )
+
+        st.error(str(e))
+
+    # Display bot response
+    with st.chat_message("assistant"):
+
+        st.write(response)
 
     st.session_state.messages.append(
         {
@@ -129,5 +329,14 @@ if user_input:
         }
     )
 
-    with st.chat_message("assistant"):
-        st.write(response)
+
+# --------------------------------------------------
+# FOOTER
+# --------------------------------------------------
+
+st.divider()
+
+st.caption(
+    "Built with Python, TensorFlow/Keras and Streamlit"
+)
+```
