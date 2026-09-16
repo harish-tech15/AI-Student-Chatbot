@@ -1,6 +1,5 @@
 streamlit
-tensorflow
+tensorflow==2.20.0
+keras==3.11.3
 numpy
 scikit-learn
-pandas
-nltk
