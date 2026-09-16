@@ -5,13 +5,12 @@ import random
 
 import numpy as np
 import streamlit as st
-import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 
 # ============================================================
-# PAGE CONFIGURATION
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
@@ -22,7 +21,7 @@ st.set_page_config(
 
 
 # ============================================================
-# PROJECT PATHS
+# PATHS
 # ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -53,7 +52,7 @@ INTENTS_PATH = os.path.join(
 
 
 # ============================================================
-# CONSTANTS
+# SETTINGS
 # ============================================================
 
 MAX_SEQUENCE_LENGTH = 6
@@ -61,20 +60,10 @@ CONFIDENCE_THRESHOLD = 0.35
 
 
 # ============================================================
-# HELPER FUNCTIONS
+# NORMALIZE TAG
 # ============================================================
 
 def normalize_tag(tag):
-    """
-    Normalize intent tags so that:
-    machine learning
-    Machine Learning
-    machine-learning
-    machine_learning
-
-    are treated as the same tag.
-    """
-
     return (
         str(tag)
         .strip()
@@ -85,91 +74,59 @@ def normalize_tag(tag):
 
 
 # ============================================================
-# LOAD CHATBOT FILES
+# LOAD CHATBOT
 # ============================================================
 
 @st.cache_resource
 def load_chatbot():
 
-    # --------------------------------------------------------
-    # Check Model
-    # --------------------------------------------------------
-
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(
-            f"Model file not found:\n{MODEL_PATH}"
+            f"Model file not found: {MODEL_PATH}"
         )
-
-    # --------------------------------------------------------
-    # Check Tokenizer
-    # --------------------------------------------------------
 
     if not os.path.exists(TOKENIZER_PATH):
         raise FileNotFoundError(
-            f"Tokenizer file not found:\n{TOKENIZER_PATH}"
+            f"Tokenizer file not found: {TOKENIZER_PATH}"
         )
-
-    # --------------------------------------------------------
-    # Check Label Encoder
-    # --------------------------------------------------------
 
     if not os.path.exists(LABEL_ENCODER_PATH):
         raise FileNotFoundError(
-            f"Label encoder file not found:\n{LABEL_ENCODER_PATH}"
+            f"Label encoder file not found: {LABEL_ENCODER_PATH}"
         )
-
-    # --------------------------------------------------------
-    # Check Intents JSON
-    # --------------------------------------------------------
 
     if not os.path.exists(INTENTS_PATH):
         raise FileNotFoundError(
-            f"Intents file not found:\n{INTENTS_PATH}"
+            f"Intents file not found: {INTENTS_PATH}"
         )
 
-    # --------------------------------------------------------
-    # Load Keras Model
-    # --------------------------------------------------------
-
+    # Load model
     model = keras.saving.load_model(
         MODEL_PATH,
         compile=False
     )
 
-    # --------------------------------------------------------
-    # Load Tokenizer
-    # --------------------------------------------------------
-
-    with open(TOKENIZER_PATH, "rb") as file:
+    # Load tokenizer
+    with open(
+        TOKENIZER_PATH,
+        "rb"
+    ) as file:
         tokenizer = pickle.load(file)
 
-    # --------------------------------------------------------
-    # Load Label Encoder
-    # --------------------------------------------------------
-
-    with open(LABEL_ENCODER_PATH, "rb") as file:
+    # Load label encoder
+    with open(
+        LABEL_ENCODER_PATH,
+        "rb"
+    ) as file:
         label_encoder = pickle.load(file)
 
-    # --------------------------------------------------------
-    # Load Intents JSON
-    # --------------------------------------------------------
-
-    try:
-
-        with open(
-            INTENTS_PATH,
-            "r",
-            encoding="utf-8"
-        ) as file:
-
-            intents = json.load(file)
-
-    except json.JSONDecodeError as e:
-
-        raise ValueError(
-            "intents.json is invalid JSON.\n\n"
-            f"Error: {e}"
-        )
+    # Load intents
+    with open(
+        INTENTS_PATH,
+        "r",
+        encoding="utf-8"
+    ) as file:
+        intents = json.load(file)
 
     return (
         model,
@@ -190,36 +147,36 @@ def predict_intent(
     label_encoder
 ):
 
-    # Convert text into sequence
+    # Convert text to numbers
     sequence = tokenizer.texts_to_sequences(
         [user_text]
     )
 
-    # Pad sequence to model's expected input length
-    sequence = pad_sequences(
+    # Pad to model input size
+    padded_sequence = pad_sequences(
         sequence,
         maxlen=MAX_SEQUENCE_LENGTH,
         padding="post",
         truncating="post"
     )
 
-    # Model prediction
+    # Predict
     prediction = model.predict(
-        sequence,
+        padded_sequence,
         verbose=0
     )
 
-    # Get predicted class
+    # Predicted class
     predicted_index = int(
         np.argmax(prediction[0])
     )
 
-    # Get confidence
+    # Confidence
     confidence = float(
         np.max(prediction[0])
     )
 
-    # Convert class number into intent name
+    # Class number -> intent name
     intent_name = label_encoder.inverse_transform(
         [predicted_index]
     )[0]
@@ -227,7 +184,7 @@ def predict_intent(
     return (
         intent_name,
         confidence,
-        sequence
+        padded_sequence
     )
 
 
@@ -244,7 +201,6 @@ def get_response(
         intent_name
     )
 
-    # Search for matching intent
     for intent in intents.get(
         "intents",
         []
@@ -261,13 +217,11 @@ def get_response(
                 []
             )
 
-            if responses:
-
+            if len(responses) > 0:
                 return random.choice(
                     responses
                 )
 
-    # Fallback response
     return (
         "Sorry, I don't have an answer "
         "for that question yet. "
@@ -276,7 +230,7 @@ def get_response(
 
 
 # ============================================================
-# LOAD EVERYTHING
+# LOAD FILES
 # ============================================================
 
 try:
@@ -288,14 +242,14 @@ try:
         intents
     ) = load_chatbot()
 
-except Exception as e:
+except Exception as error:
 
     st.error(
         "❌ Chatbot could not be loaded."
     )
 
     st.code(
-        str(e)
+        str(error)
     )
 
     st.stop()
@@ -308,9 +262,9 @@ except Exception as e:
 st.title("🤖 AI Student Chatbot")
 
 st.write(
-    "Ask questions about Artificial Intelligence, "
-    "Machine Learning, Deep Learning, Python, NLP "
-    "and other student topics."
+    "Ask questions about AI, Machine Learning, "
+    "Deep Learning, Python, NLP and other "
+    "student topics."
 )
 
 
@@ -323,35 +277,34 @@ with st.sidebar:
     st.header("📚 About")
 
     st.write(
-        "This AI Student Chatbot uses "
-        "Deep Learning and an LSTM model "
-        "to understand student questions "
-        "and predict the appropriate intent."
+        "This chatbot uses a Deep Learning "
+        "LSTM model to classify student "
+        "questions and generate responses."
     )
 
     st.divider()
 
-    st.write("### 🛠️ Technologies")
+    st.subheader("🛠️ Technologies")
 
     st.write(
         """
-        - Python
-        - TensorFlow
-        - Keras
-        - LSTM
-        - NLP
-        - Streamlit
+        • Python
+        • TensorFlow
+        • Keras
+        • LSTM
+        • NLP
+        • Streamlit
         """
     )
 
     st.divider()
 
     st.write(
-        f"**Model Input Length:** {MAX_SEQUENCE_LENGTH}"
+        f"Model Input Length: {MAX_SEQUENCE_LENGTH}"
     )
 
     st.write(
-        f"**Confidence Threshold:** "
+        f"Confidence Threshold: "
         f"{CONFIDENCE_THRESHOLD}"
     )
 
@@ -366,7 +319,7 @@ if "messages" not in st.session_state:
 
 
 # ============================================================
-# DISPLAY PREVIOUS MESSAGES
+# DISPLAY CHAT HISTORY
 # ============================================================
 
 for message in st.session_state.messages:
@@ -390,22 +343,18 @@ user_input = st.chat_input(
 
 
 # ============================================================
-# PROCESS USER QUESTION
+# PROCESS QUESTION
 # ============================================================
 
 if user_input:
 
-    # --------------------------------------------------------
-    # Display user message
-    # --------------------------------------------------------
-
+    # User message
     with st.chat_message("user"):
 
         st.markdown(
             user_input
         )
 
-    # Save user message
     st.session_state.messages.append(
         {
             "role": "user",
@@ -413,12 +362,14 @@ if user_input:
         }
     )
 
-    # --------------------------------------------------------
-    # Predict
-    # --------------------------------------------------------
+    # Default values
+    predicted_intent = "Unknown"
+    confidence = 0.0
+    input_sequence = []
 
     try:
 
+        # Predict intent
         (
             predicted_intent,
             confidence,
@@ -430,10 +381,7 @@ if user_input:
             label_encoder
         )
 
-        # ----------------------------------------------------
-        # Generate Response
-        # ----------------------------------------------------
-
+        # Generate response
         if confidence >= CONFIDENCE_THRESHOLD:
 
             response = get_response(
@@ -446,10 +394,10 @@ if user_input:
             response = (
                 "I'm not completely sure about "
                 "that question. Please try asking "
-                "the question in another way."
+                "it in another way."
             )
 
-    except Exception as e:
+    except Exception as error:
 
         response = (
             "Sorry, something went wrong "
@@ -457,25 +405,16 @@ if user_input:
         )
 
         st.error(
-            f"Error: {e}"
+            f"Error: {error}"
         )
 
-        predicted_intent = "Error"
-        confidence = 0.0
-        input_sequence = []
-
-
-    # --------------------------------------------------------
-    # Display Assistant Response
-    # --------------------------------------------------------
-
+    # Assistant response
     with st.chat_message("assistant"):
 
         st.markdown(
             response
         )
 
-    # Save assistant message
     st.session_state.messages.append(
         {
             "role": "assistant",
@@ -483,11 +422,7 @@ if user_input:
         }
     )
 
-
-    # ========================================================
-    # PREDICTION DETAILS
-    # ========================================================
-
+    # Prediction details
     with st.expander(
         "🔎 Prediction Details"
     ):
@@ -506,14 +441,20 @@ if user_input:
             "**Input Tokens:**"
         )
 
-        st.write(
-            input_sequence.tolist()
-            if hasattr(
-                input_sequence,
-                "tolist"
+        if hasattr(
+            input_sequence,
+            "tolist"
+        ):
+
+            st.write(
+                input_sequence.tolist()
             )
-            else input_sequence
-        )
+
+        else:
+
+            st.write(
+                input_sequence
+            )
 
 
 # ============================================================
@@ -523,22 +464,23 @@ if user_input:
 st.divider()
 
 st.subheader(
-    "💡 Try asking"
+    "💡 Example Questions"
 )
 
-col1, col2 = st.columns(2)
+st.info(
+    "What is Machine Learning?"
+)
 
-with col1:
+st.info(
+    "What is Deep Learning?"
+)
 
-    st.info(
-        "What is Machine Learning?"
-    )
+st.info(
+    "What is Artificial Intelligence?"
+)
 
-with col2:
-
-    st.info(
-        "What is Deep Learning?"
-    )
+st.info(
+    "What is NLP?")
 
 
 # ============================================================
