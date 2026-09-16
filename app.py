@@ -339,4 +339,3 @@ st.divider()
 st.caption(
     "Built with Python, TensorFlow/Keras and Streamlit"
 )
-```
