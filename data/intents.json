@@ -3,10 +3,12 @@
     {
       "tag": "machine_learning",
       "patterns": [
-        "What is machine learning?"
+        "What is machine learning?",
+        "Explain machine learning",
+        "What is ML?"
       ],
       "responses": [
-        "Machine Learning is a subset of Artificial Intelligence..."
+        "Machine learning is a branch of AI that allows computers to learn from data and make predictions."
       ]
     }
   ]
