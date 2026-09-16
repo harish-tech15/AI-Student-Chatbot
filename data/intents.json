@@ -1,13 +1,12 @@
 {
   "intents": [
     {
-      "tag": "greeting",
+      "tag": "machine_learning",
       "patterns": [
-        "Hello",
-        "Hi"
+        "What is machine learning?"
       ],
       "responses": [
-        "Hello! How can I help you?"
+        "Machine Learning is a subset of Artificial Intelligence..."
       ]
     }
   ]
