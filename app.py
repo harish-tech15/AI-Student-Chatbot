@@ -125,34 +125,29 @@ except Exception as e:
 # GET RESPONSE FROM INTENTS.JSON
 # =========================================================
 
+def normalize_tag(tag):
+    return (
+        str(tag)
+        .strip()
+        .lower()
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
+
+
 def get_response(intent_name):
+    predicted_tag = normalize_tag(intent_name)
 
-    if not isinstance(intents, dict):
-        return "Sorry, I could not read the chatbot knowledge base."
+    for intent in intents.get("intents", []):
+        json_tag = normalize_tag(intent.get("tag", ""))
 
-    intent_list = intents.get("intents", [])
-
-    predicted_tag = str(intent_name).strip().lower()
-
-    for intent in intent_list:
-
-        tag = str(
-            intent.get("tag", "")
-        ).strip().lower()
-
-        if tag == predicted_tag:
-
-            responses = intent.get(
-                "responses",
-                []
-            )
+        if json_tag == predicted_tag:
+            responses = intent.get("responses", [])
 
             if responses:
-                return responses[0]
+                return random.choice(responses)
 
-    return (
-        "Sorry, I don't have an answer for that question yet. "
-        "Please try asking another question."
+    return "Sorry, I don't have an answer for that question yet. Please try asking another question."
     )
 
 
